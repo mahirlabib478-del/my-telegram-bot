@@ -15,7 +15,7 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 users = {}
-broadcast_users = set() # This set stores the IDs of users who started the bot
+user_data = {}  # Stores {chat_id: username}
 wallets = {} 
 pending_approvals = {} 
 support_mode = {} 
@@ -32,7 +32,10 @@ def home():
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
-    broadcast_users.add(message.chat.id) # User added here
+    # Track user ID and Username
+    username = message.from_user.username
+    user_data[message.chat.id] = username if username else "No username"
+    
     if message.chat.id not in wallets:
         wallets[message.chat.id] = 0.0
 
@@ -64,7 +67,7 @@ def admin_commands(message):
     if message.text.startswith('/broadcast'):
         msg_text = message.text.replace("/broadcast", "").strip()
         if not msg_text: return
-        for user_id in broadcast_users:
+        for user_id in user_data:
             try: bot.send_message(user_id, msg_text)
             except: continue
         bot.reply_to(message, "✅ সবাইকে পাঠানো হয়েছে।")
@@ -78,13 +81,14 @@ def admin_commands(message):
         except Exception as e:
             bot.reply_to(message, f"❌ ব্যর্থ: {e}")
 
-    # NEW: Admin command to see user list
     elif message.text.startswith('/users'):
-        if not broadcast_users:
+        if not user_data:
             bot.reply_to(message, "⚠️ কোন ইউজার পাওয়া যায়নি।")
         else:
-            user_list = "\n".join([str(uid) for uid in broadcast_users])
-            bot.reply_to(message, f"📊 মোট ইউজার: {len(broadcast_users)}\n\nUser IDs:\n{user_list}")
+            list_text = f"📊 মোট ইউজার: {len(user_data)}\n\nID | Username\n"
+            for uid, uname in user_data.items():
+                list_text += f"{uid} | @{uname}\n"
+            bot.reply_to(message, list_text if len(list_text) < 4000 else list_text[:4000])
 
 # =========================
 # SELL BUTTON WITH CATEGORIES
@@ -121,6 +125,7 @@ def withdraw_request(call):
 def handle(message):
     chat_id = message.chat.id
     
+    # Support Mode
     if support_mode.get(chat_id):
         username = message.from_user.username
         username_str = f"@{username}" if username else "No username"
@@ -129,6 +134,7 @@ def handle(message):
         support_mode[chat_id] = False
         return
 
+    # Admin Deposit Approval
     if chat_id == ADMIN_ID and chat_id in pending_approvals:
         try:
             amount = float(message.text)
@@ -139,8 +145,11 @@ def handle(message):
             return
         except: bot.send_message(chat_id, "⚠️ ভুল সংখ্যা!")
 
+    # User Input Logic
     if chat_id in users:
         data = users[chat_id]
+        
+        # --- Withdrawal Flow ---
         if data["step"] == "w_amount":
             try:
                 amt = float(message.text)
@@ -164,6 +173,7 @@ def handle(message):
             bot.send_message(chat_id, "✅ আপনার উইথড্র রিকোয়েস্টটি অ্যাডমিনের কাছে পাঠানো হয়েছে।")
             del users[chat_id]
 
+        # --- Sell Flow ---
         elif data["step"] == "part1":
             data["part1"] = message.text
             data["step"] = "part2"
