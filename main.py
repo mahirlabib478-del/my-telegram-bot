@@ -16,6 +16,8 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 users = {}
+# Set to store unique user IDs for broadcast
+broadcast_users = set()
 
 # =========================
 # WEB SERVER
@@ -29,6 +31,8 @@ def home():
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
+    # Add user to broadcast list
+    broadcast_users.add(message.chat.id)
 
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("Sell")
@@ -39,6 +43,31 @@ def start(message):
         "এখানে আপনি Instagram 2FA account Sell দিতে পারবেন।",
         reply_markup=markup
     )
+
+# =========================
+# BROADCAST COMMAND (ADMIN ONLY)
+# =========================
+@bot.message_handler(commands=['broadcast'])
+def broadcast(message):
+    if message.chat.id == ADMIN_ID:
+        # Extract the message content after /broadcast
+        msg_text = message.text.replace("/broadcast", "").strip()
+        
+        if not msg_text:
+            bot.reply_to(message, "⚠️ দয়া করে বার্তার টেক্সট দিন। যেমন: /broadcast হ্যালো সবাই")
+            return
+
+        count = 0
+        for chat_id in broadcast_users:
+            try:
+                bot.send_message(chat_id, msg_text)
+                count += 1
+            except Exception as e:
+                print(f"Failed to send to {chat_id}: {e}")
+        
+        bot.reply_to(message, f"✅ {count} জন ব্যবহারকারীকে বার্তা পাঠানো হয়েছে।")
+    else:
+        bot.reply_to(message, "🚫 এই কমান্ডটি শুধুমাত্র অ্যাডমিনের জন্য।")
 
 # =========================
 # SELL BUTTON
