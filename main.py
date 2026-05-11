@@ -105,8 +105,12 @@ def show_wallet(message):
 @bot.message_handler(content_types=['text'])
 def handle(message):
     chat_id = message.chat.id
+    
+    # Updated logic for Support Mode
     if support_mode.get(chat_id):
-        bot.send_message(ADMIN_ID, f"📩 Support: {message.text}\nFrom: {chat_id}")
+        username = message.from_user.username
+        username_str = f"@{username}" if username else "No username"
+        bot.send_message(ADMIN_ID, f"📩 Support: {message.text}\nFrom ID: {chat_id}\nUsername: {username_str}")
         bot.send_message(chat_id, "✅ মেসেজটি পাঠানো হয়েছে।")
         support_mode[chat_id] = False
         return
