@@ -1,17 +1,32 @@
 import os
+import time
+import threading
+from flask import Flask
 import telebot
 from telebot import types
-import time
 
-# TOKEN
-TOKEN = "7995124159:AAGUOXpN5rPiboAsbAVwFOmLG572v7AIWJc"
+# =========================
+# CONFIG
+# =========================
+TOKEN = os.getenv("7995124159:AAGUOXpN5rPiboAsbAVwFOmLG572v7AIWJc")
 ADMIN_ID = 8538304896
 
 bot = telebot.TeleBot(TOKEN)
 
+app = Flask(__name__)
+
 users = {}
 
+# =========================
+# WEB SERVER
+# =========================
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+# =========================
 # START COMMAND
+# =========================
 @bot.message_handler(commands=['start'])
 def start(message):
 
@@ -21,11 +36,13 @@ def start(message):
     bot.send_message(
         message.chat.id,
         "👋 Welcome to our bot!\n\n"
-        "এখানে আপনি ইনস্টাগ্রাম 2FA আইডি Sell দিতে পারবেন।",
+        "এখানে আপনি Instagram 2FA account Sell দিতে পারবেন।",
         reply_markup=markup
     )
 
+# =========================
 # SELL BUTTON
+# =========================
 @bot.message_handler(func=lambda m: m.text == "Sell")
 def sell(message):
 
@@ -33,10 +50,12 @@ def sell(message):
 
     bot.send_message(
         message.chat.id,
-        "📌 সিরিয়াল অনুযায়ী ইউজারনেম লিস্ট দিন"
+        "📌 সিরিয়াল অনুযায়ী username লিস্ট দিন"
     )
 
+# =========================
 # MAIN TEXT HANDLER
+# =========================
 @bot.message_handler(content_types=['text'])
 def handle(message):
 
@@ -55,7 +74,7 @@ def handle(message):
 
         bot.send_message(
             chat_id,
-            "📌 সিরিয়াল অনুযায়ী পাসওয়ার্ড লিস্ট দিন"
+            "📌 সিরিয়াল অনুযায়ী password লিস্ট দিন"
         )
 
     # PART 2
@@ -94,8 +113,8 @@ def handle(message):
             f"🔥 New Sell Request\n\n"
             f"User ID: {message.from_user.id}\n"
             f"Username: {username_text}\n\n"
-            f"Usernames:\n{data['part1']}\n\n"
-            f"Passwords:\n{data['part2']}\n\n"
+            f"1M:\n{data['part1']}\n\n"
+            f"2M:\n{data['part2']}\n\n"
             f"2FA:\n{data['part3']}\n\n"
             f"bKash: {data['bkash']}"
         )
@@ -114,13 +133,32 @@ def handle(message):
 
         del users[chat_id]
 
-# RUN BOT
-print("🤖 Bot Running...")
+# =========================
+# BOT POLLING THREAD
+# =========================
+def run_bot():
 
-while True:
-    try:
-        bot.infinity_polling(timeout=60, long_polling_timeout=60)
+    print("🤖 Bot Running...")
 
-    except Exception as e:
-        print(f"Polling Error: {e}")
-        time.sleep(5)
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=60,
+                long_polling_timeout=60
+            )
+
+        except Exception as e:
+            print(f"Polling Error: {e}")
+            time.sleep(5)
+
+# =========================
+# MAIN
+# =========================
+if __name__ == "__main__":
+
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.start()
+
+    port = int(os.environ.get("PORT", 10000))
+
+    app.run(host="0.0.0.0", port=port)
