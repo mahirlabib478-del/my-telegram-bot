@@ -46,6 +46,41 @@ def start(message):
     )
 
 # =========================
+# BROADCAST & SEND COMMANDS (ADMIN ONLY)
+# =========================
+@bot.message_handler(commands=['broadcast', 'send'])
+def admin_commands(message):
+    if message.chat.id != ADMIN_ID:
+        return
+
+    # Broadcast Command: /broadcast [message]
+    if message.text.startswith('/broadcast'):
+        msg_text = message.text.replace("/broadcast", "").strip()
+        if not msg_text:
+            bot.reply_to(message, "⚠️ দয়া করে মেসেজ লিখুন। যেমন: /broadcast হ্যালো")
+            return
+        for user_id in broadcast_users:
+            try:
+                bot.send_message(user_id, msg_text)
+            except:
+                continue
+        bot.reply_to(message, "✅ সবাইকে মেসেজ পাঠানো হয়েছে।")
+
+    # Send to specific user: /send [user_id] [message]
+    elif message.text.startswith('/send'):
+        parts = message.text.split(maxsplit=2)
+        if len(parts) < 3:
+            bot.reply_to(message, "⚠️ ভুল ফরম্যাট! সঠিক নিয়ম: /send[user_id] [message]")
+            return
+        target_id = parts[1]
+        msg_text = parts[2]
+        try:
+            bot.send_message(target_id, msg_text)
+            bot.reply_to(message, f"✅ ইউজার {target_id} কে মেসেজ পাঠানো হয়েছে।")
+        except Exception as e:
+            bot.reply_to(message, f"❌ ব্যর্থ হয়েছে: {e}")
+
+# =========================
 # WALLET OPTION
 # =========================
 @bot.message_handler(func=lambda m: m.text == "Wallet")
@@ -91,7 +126,7 @@ def handle(message):
             target_user_id = pending_approvals[chat_id]
             wallets[target_user_id] = wallets.get(target_user_id, 0) + amount
             
-            bot.send_message(target_id=target_user_id, text=f"✅ পেমেন্ট নিশ্চিত! আপনার অ্যাকাউন্টে {amount} টাকা যোগ করা হয়েছে।")
+            bot.send_message(target_user_id, f"✅ পেমেন্ট নিশ্চিত! আপনার অ্যাকাউন্টে {amount} টাকা যোগ করা হয়েছে।")
             bot.send_message(chat_id, f"✅ সফলভাবে {amount} টাকা ইউজারকে দেওয়া হয়েছে।")
             del pending_approvals[chat_id]
             return
