@@ -100,7 +100,7 @@ def admin_commands(message):
     elif message.text.startswith('/setbal'):
         parts = message.text.split()
         if len(parts) < 3:
-            bot.reply_to(message, "⚠️ ব্যবহার: /setbal[user_id] [amount]")
+            bot.reply_to(message, "⚠️ ব্যবহার: /setbal [user_id] [amount]")
             return
         try:
             target_id = int(parts[1])
@@ -110,7 +110,7 @@ def admin_commands(message):
         except:
             bot.reply_to(message, "❌ ভুল হয়েছে। সঠিক ফরম্যাট: /setbal 123456 100")
 
-    # ব্যালেন্স চেক করার কমান্ড (নতুন ফিচার)
+    # ব্যালেন্স চেক করার কমান্ড (Updated)
     elif message.text.startswith('/checkbal'):
         parts = message.text.split()
         if len(parts) < 2:
@@ -120,9 +120,10 @@ def admin_commands(message):
             target_id = int(parts[1])
             balance = wallets.get(target_id, 0.0)
             username = user_data.get(target_id, "Unknown")
-            bot.reply_to(message, f"👤 ইউজার: @{username}\n🆔 আইডি: {target_id}\n💰 ব্যালেন্স: {balance} BDT")
+            # Displaying ID, Username, and Balance
+            bot.reply_to(message, f"🔍 ইউজার ইনফো:\n\n🆔 আইডি: {target_id}\n👤 ইউজারনেম: @{username}\n💰 ব্যালেন্স: {balance} BDT")
         except:
-            bot.reply_to(message, "❌ ভুল হয়েছে।")
+            bot.reply_to(message, "❌ ইউজার খুঁজে পাওয়া যায়নি অথবা ভুল আইডি।")
 
 # =========================
 # SELL BUTTON
