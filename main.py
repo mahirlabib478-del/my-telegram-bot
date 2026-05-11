@@ -14,11 +14,26 @@ ADMIN_ID = 8538304896
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# বাটন নাম স্টোর করার জন্য ডিকশনারি
+button_labels = {
+    "btn1": "Sell",
+    "btn2": "Wallet",
+    "btn3": "Support"
+}
+
 users = {}
 user_data = {}  # Stores {chat_id: username}
 wallets = {} 
 pending_approvals = {} 
 support_mode = {} 
+
+# =========================
+# HELPER: Generate Main Markup
+# =========================
+def get_main_markup():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(button_labels["btn1"], button_labels["btn2"], button_labels["btn3"])
+    return markup
 
 # =========================
 # WEB SERVER
@@ -32,40 +47,37 @@ def home():
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
-    # Track user ID and Username
     username = message.from_user.username
     user_data[message.chat.id] = username if username else "No username"
     
     if message.chat.id not in wallets:
         wallets[message.chat.id] = 0.0
 
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("Sell", "Wallet", "Support")
-
     bot.send_message(
         message.chat.id,
         "👋 Welcome to our bot!\n\n"
         "এখানে আপনি Instagram 2FA account Sell দিতে পারবেন।",
-        reply_markup=markup
+        reply_markup=get_main_markup()
     )
-
-# =========================
-# SUPPORT SYSTEM
-# =========================
-@bot.message_handler(func=lambda m: m.text == "Support")
-def support(message):
-    support_mode[message.chat.id] = True
-    bot.send_message(message.chat.id, "📩 আপনার মেসেজটি নিচে লিখুন, অ্যাডমিন আপনাকে শীঘ্রই উত্তর দেবেন।")
 
 # =========================
 # ADMIN COMMANDS
 # =========================
-@bot.message_handler(commands=['broadcast', 'send', 'users', 'setbal', 'checkbal'])
+@bot.message_handler(commands=['broadcast', 'send', 'users', 'setbal', 'checkbal', 'setbtn'])
 def admin_commands(message):
     if message.chat.id != ADMIN_ID: return
 
+    # বাটন নাম পরিবর্তনের কমান্ড
+    if message.text.startswith('/setbtn'):
+        parts = message.text.split(maxsplit=2)
+        if len(parts) < 3 or parts[1] not in button_labels:
+            bot.reply_to(message, "⚠️ ব্যবহার: /setbtn[btn1/btn2/btn3] [নাম]\nউদাহরণ: /setbtn btn1 Buy")
+            return
+        button_labels[parts[1]] = parts[2]
+        bot.reply_to(message, f"✅ {parts[1]} এর নাম পরিবর্তন করে '{parts[2]}' রাখা হয়েছে।")
+
     # ব্রডকাস্ট কমান্ড
-    if message.text.startswith('/broadcast'):
+    elif message.text.startswith('/broadcast'):
         msg_text = message.text.replace("/broadcast", "").strip()
         if not msg_text: return
         for user_id in user_data:
@@ -92,7 +104,6 @@ def admin_commands(message):
             for uid, uname in user_data.items():
                 balance = wallets.get(uid, 0.0)
                 list_text += f"{uid} | @{uname} | {balance} BDT\n"
-            
             for x in range(0, len(list_text), 4000):
                 bot.reply_to(message, list_text[x:x+4000])
 
@@ -110,7 +121,7 @@ def admin_commands(message):
         except:
             bot.reply_to(message, "❌ ভুল হয়েছে। সঠিক ফরম্যাট: /setbal 123456 100")
 
-    # ব্যালেন্স চেক করার কমান্ড (Updated)
+    # ব্যালেন্স চেক করার কমান্ড
     elif message.text.startswith('/checkbal'):
         parts = message.text.split()
         if len(parts) < 2:
@@ -120,46 +131,36 @@ def admin_commands(message):
             target_id = int(parts[1])
             balance = wallets.get(target_id, 0.0)
             username = user_data.get(target_id, "Unknown")
-            # Displaying ID, Username, and Balance
             bot.reply_to(message, f"🔍 ইউজার ইনফো:\n\n🆔 আইডি: {target_id}\n👤 ইউজারনেম: @{username}\n💰 ব্যালেন্স: {balance} BDT")
         except:
             bot.reply_to(message, "❌ ইউজার খুঁজে পাওয়া যায়নি অথবা ভুল আইডি।")
 
 # =========================
-# SELL BUTTON
+# MAIN MESSAGE HANDLER
 # =========================
-@bot.message_handler(func=lambda m: m.text == "Sell")
-def sell_menu(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("✅ Regular 2FA ID (3.10 BDT)", callback_data="sell_regular"))
-    markup.add(types.InlineKeyboardButton("✅ 1 Day Old 2FA ID (2.00 BDT)", callback_data="sell_1day"))
-    bot.send_message(message.chat.id, "📌 অনুগ্রহ করে একটি ক্যাটাগরি সিলেক্ট করুন:", reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith("sell_"))
-def process_sell_choice(call):
-    chat_id = call.message.chat.id
-    category = "Regular 2FA ID" if call.data == "sell_regular" else "1 Day Old 2FA ID"
-    users[chat_id] = {"step": "part1", "category": category}
-    bot.edit_message_text(f"📌 আপনি সিলেক্ট করেছেন: {category}\n\nএখন সিরিয়াল অনুযায়ী username লিস্ট দিন:", chat_id, call.message.message_id)
-
-# =========================
-# WALLET
-# =========================
-@bot.message_handler(func=lambda m: m.text == "Wallet")
-def show_wallet(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("💸 bKash Withdraw", callback_data="withdraw_bkash"))
-    bot.send_message(message.chat.id, f"💰 আপনার বর্তমান ব্যালেন্স: {wallets.get(message.chat.id, 0.0)} BDT", reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda call: call.data == "withdraw_bkash")
-def withdraw_request(call):
-    users[call.message.chat.id] = {"step": "w_amount"}
-    bot.edit_message_text("📌 কত টাকা উইথড্র করতে চান? (শুধুমাত্র সংখ্যা দিন):", call.message.chat.id, call.message.message_id)
-
-@bot.message_handler(content_types=['text'])
+@bot.message_handler(func=lambda m: True)
 def handle(message):
     chat_id = message.chat.id
     
+    # বাটন লজিক (Dynamic)
+    if message.text == button_labels["btn1"]:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("✅ Regular 2FA ID (3.10 BDT)", callback_data="sell_regular"))
+        markup.add(types.InlineKeyboardButton("✅ 1 Day Old 2FA ID (2.00 BDT)", callback_data="sell_1day"))
+        bot.send_message(chat_id, "📌 অনুগ্রহ করে একটি ক্যাটাগরি সিলেক্ট করুন:", reply_markup=markup)
+        return
+
+    elif message.text == button_labels["btn2"]:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("💸 bKash Withdraw", callback_data="withdraw_bkash"))
+        bot.send_message(chat_id, f"💰 আপনার বর্তমান ব্যালেন্স: {wallets.get(chat_id, 0.0)} BDT", reply_markup=markup)
+        return
+
+    elif message.text == button_labels["btn3"]:
+        support_mode[chat_id] = True
+        bot.send_message(chat_id, "📩 আপনার মেসেজটি নিচে লিখুন, অ্যাডমিন আপনাকে শীঘ্রই উত্তর দেবেন।")
+        return
+
     # Support Mode
     if support_mode.get(chat_id):
         username = message.from_user.username
@@ -183,8 +184,6 @@ def handle(message):
     # User Input Logic
     if chat_id in users:
         data = users[chat_id]
-        
-        # --- Withdrawal Flow ---
         if data["step"] == "w_amount":
             try:
                 amt = float(message.text)
@@ -208,7 +207,6 @@ def handle(message):
             bot.send_message(chat_id, "✅ আপনার উইথড্র রিকোয়েস্টটি অ্যাডমিনের কাছে পাঠানো হয়েছে।")
             del users[chat_id]
 
-        # --- Sell Flow ---
         elif data["step"] == "part1":
             data["part1"] = message.text
             data["step"] = "part2"
@@ -232,9 +230,20 @@ def handle(message):
             bot.send_message(chat_id, "✅ রিকোয়েস্ট পাঠানো হয়েছে।")
             del users[chat_id]
 
+# =========================
+# CALLBACK QUERY HANDLER
+# =========================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    if call.data.startswith("approve_"):
+    if call.data.startswith("sell_"):
+        chat_id = call.message.chat.id
+        category = "Regular 2FA ID" if call.data == "sell_regular" else "1 Day Old 2FA ID"
+        users[chat_id] = {"step": "part1", "category": category}
+        bot.edit_message_text(f"📌 আপনি সিলেক্ট করেছেন: {category}\n\nএখন সিরিয়াল অনুযায়ী username লিস্ট দিন:", chat_id, call.message.message_id)
+    elif call.data == "withdraw_bkash":
+        users[call.message.chat.id] = {"step": "w_amount"}
+        bot.edit_message_text("📌 কত টাকা উইথড্র করতে চান? (শুধুমাত্র সংখ্যা দিন):", call.message.chat.id, call.message.message_id)
+    elif call.data.startswith("approve_"):
         user_id = int(call.data.split("_")[1])
         pending_approvals[call.message.chat.id] = user_id
         bot.edit_message_text("✅ অনুমোদিত। ব্যালেন্স লিখুন:", call.message.chat.id, call.message.message_id)
