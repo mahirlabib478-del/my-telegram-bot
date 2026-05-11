@@ -8,7 +8,7 @@ from telebot import types
 # =========================
 # CONFIG
 # =========================
-TOKEN = os.getenv("7995124159:AAGUOXpN5rPiboAsbAVwFOmLG572v7AIWJc")
+TOKEN = "7995124159:AAGUOXpN5rPiboAsbAVwFOmLG572v7AIWJc"
 ADMIN_ID = 8538304896
 
 bot = telebot.TeleBot(TOKEN)
