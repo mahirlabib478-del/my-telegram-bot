@@ -18,7 +18,9 @@ app = Flask(__name__)
 button_labels = {
     "btn1": "Sell",
     "btn2": "Wallet",
-    "btn3": "Support"
+    "btn3": "Support",
+    "sell1": "Regular 2FA ID (3.10 BDT)",
+    "sell2": "1 Day Old 2FA ID (2.00 BDT)"
 }
 
 users = {}
@@ -67,17 +69,18 @@ def start(message):
 def admin_commands(message):
     if message.chat.id != ADMIN_ID: return
 
-    # বাটন নাম পরিবর্তনের কমান্ড
+    # বাটন নাম পরিবর্তন
     if message.text.startswith('/setbtn'):
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3 or parts[1] not in button_labels:
-            bot.reply_to(message, "⚠️ ব্যবহার: /setbtn[btn1/btn2/btn3] [নাম]\nউদাহরণ: /setbtn btn1 Buy")
+            bot.reply_to(message, "⚠️ ব্যবহার: /setbtn [key] [নাম]\nKeys: btn1, btn2, btn3, sell1, sell2")
             return
         button_labels[parts[1]] = parts[2]
         bot.reply_to(message, f"✅ {parts[1]} এর নাম পরিবর্তন করে '{parts[2]}' রাখা হয়েছে।")
+        return
 
     # ব্রডকাস্ট কমান্ড
-    elif message.text.startswith('/broadcast'):
+    if message.text.startswith('/broadcast'):
         msg_text = message.text.replace("/broadcast", "").strip()
         if not msg_text: return
         for user_id in user_data:
@@ -85,7 +88,7 @@ def admin_commands(message):
             except: continue
         bot.reply_to(message, "✅ সবাইকে পাঠানো হয়েছে।")
 
-    # মেসেজ পাঠানোর কমান্ড
+    # মেসেজ পাঠানো
     elif message.text.startswith('/send'):
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3: return
@@ -95,7 +98,7 @@ def admin_commands(message):
         except Exception as e:
             bot.reply_to(message, f"❌ ব্যর্থ: {e}")
 
-    # সব ইউজার এবং তাদের ব্যালেন্স দেখার কমান্ড
+    # ইউজার এবং ব্যালেন্স
     elif message.text.startswith('/users'):
         if not user_data:
             bot.reply_to(message, "⚠️ কোন ইউজার পাওয়া যায়নি।")
@@ -107,11 +110,11 @@ def admin_commands(message):
             for x in range(0, len(list_text), 4000):
                 bot.reply_to(message, list_text[x:x+4000])
 
-    # ব্যালেন্স পরিবর্তন করার কমান্ড
+    # ব্যালেন্স সেট
     elif message.text.startswith('/setbal'):
         parts = message.text.split()
         if len(parts) < 3:
-            bot.reply_to(message, "⚠️ ব্যবহার: /setbal [user_id] [amount]")
+            bot.reply_to(message, "⚠️ ব্যবহার: /setbal[user_id] [amount]")
             return
         try:
             target_id = int(parts[1])
@@ -119,9 +122,9 @@ def admin_commands(message):
             wallets[target_id] = new_balance
             bot.reply_to(message, f"✅ ইউজার {target_id}-এর নতুন ব্যালেন্স: {new_balance} BDT")
         except:
-            bot.reply_to(message, "❌ ভুল হয়েছে। সঠিক ফরম্যাট: /setbal 123456 100")
+            bot.reply_to(message, "❌ ভুল ফরম্যাট।")
 
-    # ব্যালেন্স চেক করার কমান্ড
+    # ব্যালেন্স চেক
     elif message.text.startswith('/checkbal'):
         parts = message.text.split()
         if len(parts) < 2:
@@ -133,7 +136,7 @@ def admin_commands(message):
             username = user_data.get(target_id, "Unknown")
             bot.reply_to(message, f"🔍 ইউজার ইনফো:\n\n🆔 আইডি: {target_id}\n👤 ইউজারনেম: @{username}\n💰 ব্যালেন্স: {balance} BDT")
         except:
-            bot.reply_to(message, "❌ ইউজার খুঁজে পাওয়া যায়নি অথবা ভুল আইডি।")
+            bot.reply_to(message, "❌ ইউজার খুঁজে পাওয়া যায়নি।")
 
 # =========================
 # MAIN MESSAGE HANDLER
@@ -142,11 +145,11 @@ def admin_commands(message):
 def handle(message):
     chat_id = message.chat.id
     
-    # বাটন লজিক (Dynamic)
+    # বাটন লজিক
     if message.text == button_labels["btn1"]:
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("✅ Regular 2FA ID (3.10 BDT)", callback_data="sell_regular"))
-        markup.add(types.InlineKeyboardButton("✅ 1 Day Old 2FA ID (2.00 BDT)", callback_data="sell_1day"))
+        markup.add(types.InlineKeyboardButton(button_labels["sell1"], callback_data="sell_regular"))
+        markup.add(types.InlineKeyboardButton(button_labels["sell2"], callback_data="sell_1day"))
         bot.send_message(chat_id, "📌 অনুগ্রহ করে একটি ক্যাটাগরি সিলেক্ট করুন:", reply_markup=markup)
         return
 
@@ -237,7 +240,8 @@ def handle(message):
 def callback_query(call):
     if call.data.startswith("sell_"):
         chat_id = call.message.chat.id
-        category = "Regular 2FA ID" if call.data == "sell_regular" else "1 Day Old 2FA ID"
+        # ডাইনামিক বাটন নাম ব্যবহার করা হয়েছে
+        category = button_labels["sell1"] if call.data == "sell_regular" else button_labels["sell2"]
         users[chat_id] = {"step": "part1", "category": category}
         bot.edit_message_text(f"📌 আপনি সিলেক্ট করেছেন: {category}\n\nএখন সিরিয়াল অনুযায়ী username লিস্ট দিন:", chat_id, call.message.message_id)
     elif call.data == "withdraw_bkash":
