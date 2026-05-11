@@ -106,7 +106,7 @@ def show_wallet(message):
 def handle(message):
     chat_id = message.chat.id
     
-    # Updated logic for Support Mode
+    # Support Mode
     if support_mode.get(chat_id):
         username = message.from_user.username
         username_str = f"@{username}" if username else "No username"
@@ -141,7 +141,13 @@ def handle(message):
             bot.send_message(chat_id, "📌 bKash নাম্বার দিন")
         elif data["step"] == "bkash":
             data["bkash"] = message.text
-            admin_msg = (f"🔥 New Sell: {data['category']}\nUser ID: {chat_id}\n\n1M: {data['part1']}\n2M: {data['part2']}\n2FA: {data['part3']}\nBKash: {data['bkash']}")
+            
+            # --- UPDATED SECTION START ---
+            username = message.from_user.username
+            username_str = f"@{username}" if username else "No username"
+            admin_msg = (f"🔥 New Sell: {data['category']}\nUser ID: {chat_id}\nUsername: {username_str}\n\n1M: {data['part1']}\n2M: {data['part2']}\n2FA: {data['part3']}\nBKash: {data['bkash']}")
+            # --- UPDATED SECTION END ---
+            
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_{chat_id}"), types.InlineKeyboardButton("❌ Deny", callback_data=f"deny_{chat_id}"))
             bot.send_message(ADMIN_ID, admin_msg, reply_markup=markup)
