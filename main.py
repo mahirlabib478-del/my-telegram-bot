@@ -15,7 +15,7 @@ bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
 users = {}
-broadcast_users = set()
+broadcast_users = set() # This set stores the IDs of users who started the bot
 wallets = {} 
 pending_approvals = {} 
 support_mode = {} 
@@ -32,7 +32,7 @@ def home():
 # =========================
 @bot.message_handler(commands=['start'])
 def start(message):
-    broadcast_users.add(message.chat.id)
+    broadcast_users.add(message.chat.id) # User added here
     if message.chat.id not in wallets:
         wallets[message.chat.id] = 0.0
 
@@ -57,7 +57,7 @@ def support(message):
 # =========================
 # ADMIN COMMANDS
 # =========================
-@bot.message_handler(commands=['broadcast', 'send'])
+@bot.message_handler(commands=['broadcast', 'send', 'users'])
 def admin_commands(message):
     if message.chat.id != ADMIN_ID: return
 
@@ -77,6 +77,14 @@ def admin_commands(message):
             bot.reply_to(message, "✅ পাঠানো হয়েছে।")
         except Exception as e:
             bot.reply_to(message, f"❌ ব্যর্থ: {e}")
+
+    # NEW: Admin command to see user list
+    elif message.text.startswith('/users'):
+        if not broadcast_users:
+            bot.reply_to(message, "⚠️ কোন ইউজার পাওয়া যায়নি।")
+        else:
+            user_list = "\n".join([str(uid) for uid in broadcast_users])
+            bot.reply_to(message, f"📊 মোট ইউজার: {len(broadcast_users)}\n\nUser IDs:\n{user_list}")
 
 # =========================
 # SELL BUTTON WITH CATEGORIES
@@ -113,7 +121,6 @@ def withdraw_request(call):
 def handle(message):
     chat_id = message.chat.id
     
-    # Support Mode
     if support_mode.get(chat_id):
         username = message.from_user.username
         username_str = f"@{username}" if username else "No username"
@@ -122,7 +129,6 @@ def handle(message):
         support_mode[chat_id] = False
         return
 
-    # Admin Deposit Approval
     if chat_id == ADMIN_ID and chat_id in pending_approvals:
         try:
             amount = float(message.text)
@@ -133,11 +139,8 @@ def handle(message):
             return
         except: bot.send_message(chat_id, "⚠️ ভুল সংখ্যা!")
 
-    # User Input Logic
     if chat_id in users:
         data = users[chat_id]
-        
-        # --- Withdrawal Flow ---
         if data["step"] == "w_amount":
             try:
                 amt = float(message.text)
@@ -155,14 +158,12 @@ def handle(message):
             number = message.text
             user = message.from_user.username or "N/A"
             admin_text = f"🚨 New bKash Withdrawal\nUser: @{user}\nAmount: {amt} BDT\nbKash Number: {number}"
-            
             markup = types.InlineKeyboardMarkup()
             markup.add(types.InlineKeyboardButton("✅ Paid", callback_data=f"wpay_{chat_id}_{amt}"), types.InlineKeyboardButton("❌ Deny", callback_data=f"wdeny_{chat_id}"))
             bot.send_message(ADMIN_ID, admin_text, reply_markup=markup)
             bot.send_message(chat_id, "✅ আপনার উইথড্র রিকোয়েস্টটি অ্যাডমিনের কাছে পাঠানো হয়েছে।")
             del users[chat_id]
 
-        # --- Sell Flow ---
         elif data["step"] == "part1":
             data["part1"] = message.text
             data["step"] = "part2"
@@ -188,7 +189,6 @@ def handle(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    # Sell Processing
     if call.data.startswith("approve_"):
         user_id = int(call.data.split("_")[1])
         pending_approvals[call.message.chat.id] = user_id
@@ -196,8 +196,6 @@ def callback_query(call):
     elif call.data.startswith("deny_"):
         bot.send_message(int(call.data.split("_")[1]), "❌ দুঃখিত, আপনার রিকোয়েস্টটি রিজেক্ট করা হয়েছে।")
         bot.edit_message_text("❌ রিজেক্ট করা হয়েছে।", call.message.chat.id, call.message.message_id)
-    
-    # Withdrawal Processing
     elif call.data.startswith("wpay_"):
         _, uid, amt = call.data.split("_")
         wallets[int(uid)] = wallets.get(int(uid), 0) - float(amt)
