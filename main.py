@@ -60,7 +60,7 @@ def support(message):
 # =========================
 # ADMIN COMMANDS
 # =========================
-@bot.message_handler(commands=['broadcast', 'send', 'users', 'setbal'])
+@bot.message_handler(commands=['broadcast', 'send', 'users', 'setbal', 'checkbal'])
 def admin_commands(message):
     if message.chat.id != ADMIN_ID: return
 
@@ -93,15 +93,14 @@ def admin_commands(message):
                 balance = wallets.get(uid, 0.0)
                 list_text += f"{uid} | @{uname} | {balance} BDT\n"
             
-            # লম্বা লিস্ট হলে ভাগ করে পাঠানো
             for x in range(0, len(list_text), 4000):
                 bot.reply_to(message, list_text[x:x+4000])
 
-    # ব্যালেন্স পরিবর্তন করার কমান্ড (উদাহরণ: /setbal [user_id] [amount])
+    # ব্যালেন্স পরিবর্তন করার কমান্ড
     elif message.text.startswith('/setbal'):
         parts = message.text.split()
         if len(parts) < 3:
-            bot.reply_to(message, "⚠️ ব্যবহার: /setbal [user_id] [amount]")
+            bot.reply_to(message, "⚠️ ব্যবহার: /setbal[user_id] [amount]")
             return
         try:
             target_id = int(parts[1])
@@ -111,10 +110,23 @@ def admin_commands(message):
         except:
             bot.reply_to(message, "❌ ভুল হয়েছে। সঠিক ফরম্যাট: /setbal 123456 100")
 
-# =========================
-# (বাকি কোড অপরিবর্তিত রাখা হয়েছে)
-# =========================
+    # ব্যালেন্স চেক করার কমান্ড (নতুন ফিচার)
+    elif message.text.startswith('/checkbal'):
+        parts = message.text.split()
+        if len(parts) < 2:
+            bot.reply_to(message, "⚠️ ব্যবহার: /checkbal [user_id]")
+            return
+        try:
+            target_id = int(parts[1])
+            balance = wallets.get(target_id, 0.0)
+            username = user_data.get(target_id, "Unknown")
+            bot.reply_to(message, f"👤 ইউজার: @{username}\n🆔 আইডি: {target_id}\n💰 ব্যালেন্স: {balance} BDT")
+        except:
+            bot.reply_to(message, "❌ ভুল হয়েছে।")
 
+# =========================
+# SELL BUTTON
+# =========================
 @bot.message_handler(func=lambda m: m.text == "Sell")
 def sell_menu(message):
     markup = types.InlineKeyboardMarkup()
@@ -129,6 +141,9 @@ def process_sell_choice(call):
     users[chat_id] = {"step": "part1", "category": category}
     bot.edit_message_text(f"📌 আপনি সিলেক্ট করেছেন: {category}\n\nএখন সিরিয়াল অনুযায়ী username লিস্ট দিন:", chat_id, call.message.message_id)
 
+# =========================
+# WALLET
+# =========================
 @bot.message_handler(func=lambda m: m.text == "Wallet")
 def show_wallet(message):
     markup = types.InlineKeyboardMarkup()
@@ -143,6 +158,8 @@ def withdraw_request(call):
 @bot.message_handler(content_types=['text'])
 def handle(message):
     chat_id = message.chat.id
+    
+    # Support Mode
     if support_mode.get(chat_id):
         username = message.from_user.username
         username_str = f"@{username}" if username else "No username"
@@ -151,6 +168,7 @@ def handle(message):
         support_mode[chat_id] = False
         return
 
+    # Admin Deposit Approval
     if chat_id == ADMIN_ID and chat_id in pending_approvals:
         try:
             amount = float(message.text)
@@ -161,8 +179,11 @@ def handle(message):
             return
         except: bot.send_message(chat_id, "⚠️ ভুল সংখ্যা!")
 
+    # User Input Logic
     if chat_id in users:
         data = users[chat_id]
+        
+        # --- Withdrawal Flow ---
         if data["step"] == "w_amount":
             try:
                 amt = float(message.text)
@@ -186,6 +207,7 @@ def handle(message):
             bot.send_message(chat_id, "✅ আপনার উইথড্র রিকোয়েস্টটি অ্যাডমিনের কাছে পাঠানো হয়েছে।")
             del users[chat_id]
 
+        # --- Sell Flow ---
         elif data["step"] == "part1":
             data["part1"] = message.text
             data["step"] = "part2"
